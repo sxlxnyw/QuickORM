@@ -38,8 +38,8 @@ class Expr(object):
                 for key, val in kwargs.iteritems():
                     if val is None or key not in self.model.fields:
                         continue
-                _keys.append(key)
-                _params.append(val)
+                    _keys.append(key)
+                    _params.append(val)
                 insert = 'insert ignore into %s(%s) values (%s);' % (
                 self.model.db_table, ', '.join(_keys), ', '.join(['%s'] * len(_keys)))
                 return Database.execute(insert,_params)
