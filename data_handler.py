@@ -1,7 +1,7 @@
 # coding: utf-8
 
 import MySQLdb
-
+import datetime
 
 class Field(object):
     pass
@@ -11,38 +11,78 @@ class Expr(object):
     def __init__(self, model, kwargs):
         self.model = model
         # How to deal with a non-dict parameter?
+        self.where = kwargs
         self.params = kwargs.values()
-        equations = [key + ' = %s' for key in kwargs.keys()]
+        equations = ['`'+key + '` = %s' for key in kwargs.keys()]
         self.where_expr = 'where ' + ' and '.join(equations) if len(equations) > 0 else ''
 
     def update(self, **kwargs):
         _keys = []
         _params = []
         for key, val in kwargs.iteritems():
+            if key == "updated_at":
+                continue
             if val is None or key not in self.model.fields:
                 continue
             _keys.append(key)
             _params.append(val)
+        if "updated_at" in self.model.fields:
+            _keys.append("updated_at")
+            _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+
         _params.extend(self.params)
-        sql = 'update %s set %s %s;' % (
-            self.model.db_table, ', '.join([key + ' = %s' for key in _keys]), self.where_expr)
+        sql = 'update `%s` set %s %s;' % (
+            self.model.db_table, ', '.join(['`'+key + '` = %s' for key in _keys]), self.where_expr)
         return Database.execute(sql, _params)
-        
-     def iupdate(self, **kwargs):
-            count = self.count()
-            if count>0:
-                return self.update(kwargs)
-            else:
-                _keys = []
-                _params = []
-                for key, val in kwargs.iteritems():
-                    if val is None or key not in self.model.fields:
-                        continue
-                    _keys.append(key)
-                    _params.append(val)
-                insert = 'insert ignore into %s(%s) values (%s);' % (
+
+    def iupdate(self, **kwargs):
+        count = self.count()
+        if count > 0:
+            return self.update(kwargs)
+        else:
+            _keys = []
+            _params = []
+            for key, val in kwargs.iteritems():
+                if val is None or key == "updated_at" or key == "created_at" or key not in self.model.fields:
+                    continue
+                _keys.append(key)
+                _params.append(val)
+            if "updated_at" in self.model.fields:
+                _keys.append("updated_at")
+                _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            if "created_at" in self.model.fields:
+                _keys.append("created_at")
+                _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            insert = 'insert ignore into %s(%s) values (%s);' % (
                 self.model.db_table, ', '.join(_keys), ', '.join(['%s'] * len(_keys)))
-                return Database.execute(insert,_params)
+            return Database.execute(insert, _params)
+
+    def replace(self, **kwargs):
+        row = self.select_one()
+        if row is None:
+            _keys = []
+            _params = []
+            for key, val in kwargs.iteritems():
+                if val is None or key == "updated_at" or key == "created_at" or key not in self.model.fields:
+                    continue
+                _keys.append(key)
+                _params.append(val)
+            for key, val in self.where.iteritems():
+                if val is None or key == "updated_at" or key == "created_at" or key not in self.model.fields:
+                    continue
+                _keys.append(key)
+                _params.append(val)
+            if "updated_at" in self.model.fields:
+                _keys.append("updated_at")
+                _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            if "created_at" in self.model.fields:
+                _keys.append("created_at")
+                _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            insert = 'insert ignore into %s(%s) values (%s);' % (
+                self.model.db_table, ', '.join(_keys), ', '.join(['%s'] * len(_keys)))
+            Database.execute(insert, _params)
+            row = self.select_one()
+        return row
 
     def limit(self, rows, offset=None):
         self.where_expr += ' limit %s%s' % (
@@ -50,7 +90,7 @@ class Expr(object):
         return self
 
     def select(self):
-        sql = 'select %s from %s %s;' % (', '.join(self.model.fields.keys()), self.model.db_table, self.where_expr)
+        sql = 'select `%s` from `%s` %s;' % ('`,`'.join(self.model.fields.keys()), self.model.db_table, self.where_expr)
         for row in Database.execute(sql, self.params).fetchall():
             inst = self.model()
             for idx, f in enumerate(row):
@@ -58,9 +98,20 @@ class Expr(object):
             yield inst
 
     def count(self):
-        sql = 'select count(*) from %s %s;' % (self.model.db_table, self.where_expr)
+        sql = 'select count(*) from `%s` %s;' % (self.model.db_table, self.where_expr)
         (row_cnt, ) = Database.execute(sql, self.params).fetchone()
         return row_cnt
+
+    def select_one(self):
+        self.limit(1)
+        sql = 'select `%s` from `%s` %s;' % ('`,`'.join(self.model.fields.keys()), self.model.db_table, self.where_expr)
+        row = Database.execute(sql, self.params).fetchone()
+        if row:
+            inst = self.model()
+            for idx, f in enumerate(row):
+                setattr(inst, self.model.fields.keys()[idx], f)
+            return inst
+        return None
 
 
 class MetaModel(type):
@@ -81,8 +132,22 @@ class Model(object):
     __metaclass__ = MetaModel
 
     def save(self):
-        insert = 'insert ignore into %s(%s) values (%s);' % (
-            self.db_table, ', '.join(self.__dict__.keys()), ', '.join(['%s'] * len(self.__dict__)))
+        _keys = []
+        _params = []
+        for key, val in self.__dict__.iteritems():
+            if key == "updated_at" or key == "created_at":
+                continue
+            _keys.append(key)
+            _params.append(val)
+        if "updated_at" in self.fields:
+            _keys.append("updated_at")
+            _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        if "created_at" in self.fields:
+            _keys.append("created_at")
+            _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+
+        insert = 'insert ignore into `%s`(`%s`) values (%s);' % (
+            self.db_table, '`,`'.join(self.__dict__.keys()), ', '.join(['%s'] * len(self.__dict__)))
         return Database.execute(insert, self.__dict__.values())
 
     @classmethod
