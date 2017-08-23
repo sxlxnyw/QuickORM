@@ -27,6 +27,22 @@ class Expr(object):
         sql = 'update %s set %s %s;' % (
             self.model.db_table, ', '.join([key + ' = %s' for key in _keys]), self.where_expr)
         return Database.execute(sql, _params)
+        
+     def iupdate(self, **kwargs):
+            count = self.count()
+            if count>0:
+                return self.update(kwargs)
+            else:
+                _keys = []
+                _params = []
+                for key, val in kwargs.iteritems():
+                    if val is None or key not in self.model.fields:
+                        continue
+                _keys.append(key)
+                _params.append(val)
+                insert = 'insert ignore into %s(%s) values (%s);' % (
+                self.model.db_table, ', '.join(_keys), ', '.join(['%s'] * len(_keys)))
+                return Database.execute(insert,_params)
 
     def limit(self, rows, offset=None):
         self.where_expr += ' limit %s%s' % (
