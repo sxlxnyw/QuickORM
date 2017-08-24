@@ -75,6 +75,6 @@ for val, cnt in results:
   print val, cnt
 ```
 
-connect pool
+Connect pool
 ---------------
 http://blog.csdn.net/zbc1090549839/article/details/51336458
