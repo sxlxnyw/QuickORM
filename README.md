@@ -84,4 +84,14 @@ Sub table
 ---------------
 http://www.yiichina.com/topic/2531
 
+```SQL
 select `TABLE_NAME` from `INFORMATION_SCHEMA`.`TABLES` where `TABLE_SCHEMA`='dbname' and `TABLE_NAME`='tbname' 
+
+CREATE TABLE IF NOT EXISTS `student` (#判断这张表是否存在，若存在，则跳过创建表操作，  
+ `s_id` varchar(40) NOT NULL,   
+`s_name` varchar(255) default NULL,   
+`s_age` varchar(255) default NULL,   
+`s_msg` varchar(255) default NULL,   
+PRIMARY KEY (`s_id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8;  
+INSERT INTO `student` VALUES ('7', '重阳节', '33', '登高赏菊');  
+```
