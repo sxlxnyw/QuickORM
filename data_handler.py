@@ -32,7 +32,7 @@ class Expr(object):
 
         _params.extend(self.params)
         sql = 'update `%s` set %s %s;' % (
-            self.model.db_table, ', '.join(['`'+key + '` = %s' for key in _keys]), self.where_expr)
+            self.model.table_name(), ', '.join(['`'+key + '` = %s' for key in _keys]), self.where_expr)
         return Database.execute(sql, _params)
 
     def upsert(self, **kwargs):
@@ -54,7 +54,7 @@ class Expr(object):
                 _keys.append("created_at")
                 _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             insert = 'insert ignore into %s(%s) values (%s);' % (
-                self.model.db_table, ', '.join(_keys), ', '.join(['%s'] * len(_keys)))
+                self.model.table_name(), ', '.join(_keys), ', '.join(['%s'] * len(_keys)))
             return Database.execute(insert, _params)
 
     def selectsert(self, **kwargs):
@@ -79,7 +79,7 @@ class Expr(object):
                 _keys.append("created_at")
                 _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             insert = 'insert ignore into %s(%s) values (%s);' % (
-                self.model.db_table, ', '.join(_keys), ', '.join(['%s'] * len(_keys)))
+                self.model.table_name(), ', '.join(_keys), ', '.join(['%s'] * len(_keys)))
             Database.execute(insert, _params)
             row = self.select_one()
         return row
@@ -90,7 +90,7 @@ class Expr(object):
         return self
 
     def select(self):
-        sql = 'select `%s` from `%s` %s;' % ('`,`'.join(self.model.fields.keys()), self.model.db_table, self.where_expr)
+        sql = 'select `%s` from `%s` %s;' % ('`,`'.join(self.model.fields.keys()), self.model.table_name(), self.where_expr)
         for row in Database.execute(sql, self.params).fetchall():
             inst = self.model()
             for idx, f in enumerate(row):
@@ -98,13 +98,13 @@ class Expr(object):
             yield inst
 
     def count(self):
-        sql = 'select count(*) from `%s` %s;' % (self.model.db_table, self.where_expr)
+        sql = 'select count(*) from `%s` %s;' % (self.model.table_name(), self.where_expr)
         (row_cnt, ) = Database.execute(sql, self.params).fetchone()
         return row_cnt
 
     def select_one(self):
         self.limit(1)
-        sql = 'select `%s` from `%s` %s;' % ('`,`'.join(self.model.fields.keys()), self.model.db_table, self.where_expr)
+        sql = 'select `%s` from `%s` %s;' % ('`,`'.join(self.model.fields.keys()), self.model.table_name(), self.where_expr)
         row = Database.execute(sql, self.params).fetchone()
         if row:
             inst = self.model()
@@ -147,13 +147,17 @@ class Model(object):
             _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
         insert = 'insert ignore into `%s`(`%s`) values (%s);' % (
-            self.db_table, '`,`'.join(self.__dict__.keys()), ', '.join(['%s'] * len(self.__dict__)))
+            self.table_name(), '`,`'.join(self.__dict__.keys()), ', '.join(['%s'] * len(self.__dict__)))
         Database.execute(insert, self.__dict__.values())
         self.id = Database.execute('SELECT LAST_INSERT_ID()')
 
     @classmethod
     def where(cls, **kwargs):
         return Expr(cls, kwargs)
+    
+    @classmethod
+    def table_name(cls):
+        return cls.db_table
 
 
 class Database(object):
