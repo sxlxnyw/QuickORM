@@ -35,7 +35,7 @@ class Expr(object):
             self.model.db_table, ', '.join(['`'+key + '` = %s' for key in _keys]), self.where_expr)
         return Database.execute(sql, _params)
 
-    def iupdate(self, **kwargs):
+    def upsert(self, **kwargs):
         count = self.count()
         if count > 0:
             return self.update(kwargs)
@@ -57,7 +57,7 @@ class Expr(object):
                 self.model.db_table, ', '.join(_keys), ', '.join(['%s'] * len(_keys)))
             return Database.execute(insert, _params)
 
-    def replace(self, **kwargs):
+    def selectsert(self, **kwargs):
         row = self.select_one()
         if row is None:
             _keys = []
