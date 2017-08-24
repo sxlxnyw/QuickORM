@@ -111,7 +111,6 @@ class Expr(object):
     def select_one(self):
         self.limit(1)
         sql = 'select `%s` from `%s` %s %s;' % ('`,`'.join(self.model.fields.keys()), self.model.table_name(), self.where_expr, self.limit_expr)
-        print sql+"\n"
         row = Database.execute(sql, self.params).fetchone()
         if row:
             inst = self.model()
@@ -143,7 +142,6 @@ class Model(object):
         _params = []
         if "id" in self.__dict__.keys():
             for key, val in self.__dict__.iteritems():
-                print key
                 if key == "updated_at" or key == "created_at" or key == "id":
                     continue
                 _keys.append(key)
@@ -153,12 +151,9 @@ class Model(object):
                 _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             update = 'update `%s` set %s where id=%s;' % (
                 self.table_name(), ','.join(['`'+key + '` = %s' for key in _keys]), self.id)
-            print update
-            print _params
             Database.execute(update, _params)
         else:
             for key, val in self.__dict__.iteritems():
-                print key
                 if key == "updated_at" or key == "created_at":
                     continue
                 _keys.append(key)
