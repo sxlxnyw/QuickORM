@@ -78,3 +78,8 @@ for val, cnt in results:
 Connection pool
 ---------------
 http://blog.csdn.net/zbc1090549839/article/details/51336458
+
+
+Sub table
+---------------
+http://www.yiichina.com/topic/2531
