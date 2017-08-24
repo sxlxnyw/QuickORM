@@ -74,3 +74,7 @@ results = execute_raw_sql('select b, count(*) from test where b = %s group by b;
 for val, cnt in results:
   print val, cnt
 ```
+
+connect pool
+---------------
+http://blog.csdn.net/zbc1090549839/article/details/51336458
