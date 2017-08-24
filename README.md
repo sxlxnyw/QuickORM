@@ -83,3 +83,4 @@ http://blog.csdn.net/zbc1090549839/article/details/51336458
 Sub table
 ---------------
 http://www.yiichina.com/topic/2531
+select `TABLE_NAME` from `INFORMATION_SCHEMA`.`TABLES` where `TABLE_SCHEMA`='dbname' and `TABLE_NAME`='tbname' 
