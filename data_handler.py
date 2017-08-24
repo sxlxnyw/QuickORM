@@ -148,7 +148,8 @@ class Model(object):
 
         insert = 'insert ignore into `%s`(`%s`) values (%s);' % (
             self.db_table, '`,`'.join(self.__dict__.keys()), ', '.join(['%s'] * len(self.__dict__)))
-        return Database.execute(insert, self.__dict__.values())
+        Database.execute(insert, self.__dict__.values())
+        self.id = Database.execute('SELECT LAST_INSERT_ID()')
 
     @classmethod
     def where(cls, **kwargs):
