@@ -15,6 +15,7 @@ class Expr(object):
         self.params = kwargs.values()
         equations = ['`'+key + '` = %s' for key in kwargs.keys()]
         self.where_expr = 'where ' + ' and '.join(equations) if len(equations) > 0 else ''
+        self.limit_expr = ""
 
     def update(self, **kwargs):
         _keys = []
@@ -33,16 +34,21 @@ class Expr(object):
         _params.extend(self.params)
         sql = 'update `%s` set %s %s;' % (
             self.model.table_name(), ', '.join(['`'+key + '` = %s' for key in _keys]), self.where_expr)
-        return Database.execute(sql, _params)
+        return Database.execute(sql, _params).rowcount
 
     def upsert(self, **kwargs):
         count = self.count()
         if count > 0:
-            return self.update(kwargs)
+            return self.update(**kwargs)
         else:
             _keys = []
             _params = []
             for key, val in kwargs.iteritems():
+                if val is None or key == "updated_at" or key == "created_at" or key not in self.model.fields:
+                    continue
+                _keys.append(key)
+                _params.append(val)
+            for key, val in self.where.iteritems():
                 if val is None or key == "updated_at" or key == "created_at" or key not in self.model.fields:
                     continue
                 _keys.append(key)
@@ -55,7 +61,7 @@ class Expr(object):
                 _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             insert = 'insert ignore into %s(%s) values (%s);' % (
                 self.model.table_name(), ', '.join(_keys), ', '.join(['%s'] * len(_keys)))
-            return Database.execute(insert, _params)
+            return Database.execute(insert, _params).rowcount
 
     def selectsert(self, **kwargs):
         row = self.select_one()
@@ -85,12 +91,12 @@ class Expr(object):
         return row
 
     def limit(self, rows, offset=None):
-        self.where_expr += ' limit %s%s' % (
+        self.limit_expr = ' limit %s%s' % (
             '%s, ' % offset if offset is not None else '', rows)
         return self
 
     def select(self):
-        sql = 'select `%s` from `%s` %s;' % ('`,`'.join(self.model.fields.keys()), self.model.table_name(), self.where_expr)
+        sql = 'select `%s` from `%s` %s %s;' % ('`,`'.join(self.model.fields.keys()), self.model.table_name(), self.where_expr, self.limit_expr)
         for row in Database.execute(sql, self.params).fetchall():
             inst = self.model()
             for idx, f in enumerate(row):
@@ -98,13 +104,14 @@ class Expr(object):
             yield inst
 
     def count(self):
-        sql = 'select count(*) from `%s` %s;' % (self.model.table_name(), self.where_expr)
+        sql = 'select count(*) from `%s` %s %s;' % (self.model.table_name(), self.where_expr, self.limit_expr)
         (row_cnt, ) = Database.execute(sql, self.params).fetchone()
         return row_cnt
 
     def select_one(self):
         self.limit(1)
-        sql = 'select `%s` from `%s` %s;' % ('`,`'.join(self.model.fields.keys()), self.model.table_name(), self.where_expr)
+        sql = 'select `%s` from `%s` %s %s;' % ('`,`'.join(self.model.fields.keys()), self.model.table_name(), self.where_expr, self.limit_expr)
+        print sql+"\n"
         row = Database.execute(sql, self.params).fetchone()
         if row:
             inst = self.model()
@@ -134,22 +141,39 @@ class Model(object):
     def save(self):
         _keys = []
         _params = []
-        for key, val in self.__dict__.iteritems():
-            if key == "updated_at" or key == "created_at":
-                continue
-            _keys.append(key)
-            _params.append(val)
-        if "updated_at" in self.fields:
-            _keys.append("updated_at")
-            _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        if "created_at" in self.fields:
-            _keys.append("created_at")
-            _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        if "id" in self.__dict__.keys():
+            for key, val in self.__dict__.iteritems():
+                print key
+                if key == "updated_at" or key == "created_at" or key == "id":
+                    continue
+                _keys.append(key)
+                _params.append(val)
+            if "updated_at" in self.fields:
+                _keys.append("updated_at")
+                _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            update = 'update `%s` set %s where id=%s;' % (
+                self.table_name(), ','.join(['`'+key + '` = %s' for key in _keys]), self.id)
+            print update
+            print _params
+            Database.execute(update, _params)
+        else:
+            for key, val in self.__dict__.iteritems():
+                print key
+                if key == "updated_at" or key == "created_at":
+                    continue
+                _keys.append(key)
+                _params.append(val)
+            if "created_at" in self.fields:
+                _keys.append("created_at")
+                _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            if "updated_at" in self.fields:
+                _keys.append("updated_at")
+                _params.append(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 
-        insert = 'insert ignore into `%s`(`%s`) values (%s);' % (
-            self.table_name(), '`,`'.join(self.__dict__.keys()), ', '.join(['%s'] * len(self.__dict__)))
-        Database.execute(insert, self.__dict__.values())
-        self.id = Database.execute('SELECT LAST_INSERT_ID()')
+            insert = 'insert ignore into `%s`(`%s`) values (%s);' % (
+                self.table_name(), '`,`'.join(_keys), ', '.join(['%s'] * len(_keys)))
+            Database.execute(insert, _params)
+            (self.id, ) = Database.execute('SELECT LAST_INSERT_ID()').fetchone()
 
     @classmethod
     def where(cls, **kwargs):
@@ -196,3 +220,9 @@ class Database(object):
 
 def execute_raw_sql(sql, params=None):
     return Database.execute(sql, params) if params else Database.execute(sql)
+
+def main():
+   print "we are in %s"%__name__
+
+if __name__ == '__main__':
+  main()
