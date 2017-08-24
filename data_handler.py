@@ -138,6 +138,7 @@ class Model(object):
     __metaclass__ = MetaModel
 
     def save(self):
+        self.before_save()
         _keys = []
         _params = []
         if "id" in self.__dict__.keys():
@@ -169,6 +170,9 @@ class Model(object):
                 self.table_name(), '`,`'.join(_keys), ', '.join(['%s'] * len(_keys)))
             Database.execute(insert, _params)
             (self.id, ) = Database.execute('SELECT LAST_INSERT_ID()').fetchone()
+    
+    def before_save(self):
+        pass
 
     @classmethod
     def where(cls, **kwargs):
@@ -177,7 +181,6 @@ class Model(object):
     @classmethod
     def table_name(cls):
         return cls.db_table
-
 
 class Database(object):
     autocommit = True
